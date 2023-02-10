@@ -1,5 +1,7 @@
 const config={
-    jwt:"secretKey"
+    jwt:"secretKey",
+    emailUser:'',
+    emailPassword:''
 }
 
 module.exports= config;

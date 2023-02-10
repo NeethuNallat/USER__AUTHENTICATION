@@ -15,7 +15,12 @@ router.get('/test',auth,function(req,res){
 
 //update password
 
+// router.post('/update_password',auth,user_controll.update_password);
 router.post('/update_password',user_controll.update_password);
+
+ //forget paasword
+
+ router.post('/forget_password',user_controll.forget_password);
 
 
 

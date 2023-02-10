@@ -12,6 +12,10 @@ const user = mongoose.Schema({
      password:{
         type:String,
         required:true
+     },
+     token:{
+      type:String,
+      default:''
      }
 });
 

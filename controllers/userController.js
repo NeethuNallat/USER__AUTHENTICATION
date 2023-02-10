@@ -2,6 +2,105 @@ const User = require("../models/userModel");
 const bcryptjs = require("bcryptjs");
 const config = require("../config/config");
 const jwtToken = require("jsonwebtoken");
+const { EMAIL, PASSWORD } = require('../env');
+const Mailgen = require('mailgen');
+
+const nodemailer = require("nodemailer");
+const randomstring = require("randomstring");
+
+
+/**sent mail from real gmail account */
+
+const sendResetPasswordMail = (name, email, token) => {
+    let config = {
+        service: 'gmail',
+        auth: {
+            user: EMAIL,
+            pass: PASSWORD
+        }
+    }
+    const transporter = nodemailer.createTransport(config)
+
+    let Maingenarator = new Mailgen({
+        theme: "default",
+        product: {
+            name: "Mailgen",
+            link: 'https://mailgen.js'
+        }
+    });
+
+    let response = {
+        body: {
+            name: "Neethu.Nallat",
+            intro: "Your bill has arrived",
+            table: {
+                data: [
+                    {
+                        item: "Nodemailer Stack Book",
+                        description: "A Backend application",
+                        price: "$10.99",
+                    }
+                ]
+
+            },
+            outro: "looking forward to do more business"
+
+        }
+    }
+
+    let mail = Maingenarator.generate(response)
+
+    let message = {
+        from: EMAIL,
+        to: email,
+        subject: "Place order",
+        html: mail
+    }
+
+    transporter.sendMail(message, function (error, info) {
+        if (error) {
+            console.log(error);
+        } else {
+            console.log("Message Sent", info.response);
+        }
+    })
+    res.status(201).json("get bill succesfully......")
+
+}
+
+// const sendResetPasswordMail=async(name,email,token)=>{
+
+//     try {
+//       const transporter =await  nodemailer.createTransport({
+//             host:'smtp.gmail.com',
+//             port:587,
+//             secure:false,
+//             requireTLS:true,
+//             auth:{
+//                 user:config.emailUser,
+//                 pass:config.emailPassword
+//             }
+//         });
+
+//         const mailOptions={
+//             from:config.emailUser,
+//             to:email,
+//             subject:'Fore reset password',
+//             html:'<p>Hii '+name+ ',Please copy the link and <a href="localhost:3001/forget_password?token='+token+'"> reset your password </a> '
+//         }
+//         transporter.sendMail(mailOptions,function(error,infor){
+//             if(error){
+//                 console.log(error);
+//             }else{
+//                 console.log("Mail has been sent :- ",infor.response);
+//             }
+//         });
+
+//     } catch (error) {
+//         res.status(400).send({success:false,msg:message.error});
+//     }
+
+// }
 
 
 ///Token
@@ -17,6 +116,8 @@ const create_token = async (id) => {
 
 }
 
+//secure password
+
 const securePassword = async (password) => {
     try {
         const passwordHash = await bcryptjs.hash(password, 10);
@@ -25,6 +126,8 @@ const securePassword = async (password) => {
         res.status(400).send(error.message);
     }
 }
+
+//register
 
 const register = async (req, res) => {
 
@@ -104,12 +207,12 @@ const update_password = async (req, res) => {
         const password = req.body.password;
 
         const data = await User.findOne({ email });
-        
+
         // console.log(data)
         if (data) {
             const newPassword = await securePassword(password);
             console.log(newPassword)
-            const userData = await  User.findOneAndUpdate({ email }, {
+            const userData = await User.findOneAndUpdate({ email }, {
                 $set: {
                     password: newPassword
 
@@ -130,8 +233,35 @@ const update_password = async (req, res) => {
 
 }
 
+//forget_password
+
+
+const forget_password = async (req, res) => {
+
+    try {
+
+        const email = req.body.email;
+        const userData = await User.findOne({ email });
+
+        if (userData) {
+            const randomString = randomstring.generate();
+            const data = await User.findOneAndUpdate({ email }, { $set: { token: randomString } });
+            console.log("hello");
+            await sendResetPasswordMail(userData.name, userData.email, randomString)
+            res.status(200).send({ success: true, msg: "Please check your inbox of  mail and reset your password" });
+
+        } else {
+            res.status(200).send({ success: true, msg: "this email is not exists" });
+
+        }
+    } catch (error) {
+        res.status(404).send({ success: false, msg: error.message });
+    }
+}
+
 module.exports = {
     register,
     login,
-    update_password
+    update_password,
+    forget_password
 }
