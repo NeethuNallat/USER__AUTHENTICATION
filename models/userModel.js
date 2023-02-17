@@ -16,6 +16,10 @@ const user = mongoose.Schema({
      token:{
       type:String,
       default:''
+     },
+     verified:{
+      type:Boolean,
+      default:'false'
      }
 });
 

@@ -7,11 +7,12 @@ const Mailgen = require('mailgen');
 
 const nodemailer = require("nodemailer");
 const randomstring = require("randomstring");
+const { findOneAndUpdate } = require("../models/userModel");
 
 
 /**sent mail from real gmail account */
 
-const sendResetPasswordMail = (name, email, token) => {
+const sendResetPasswordMail = (name,email,text,instruction,link ) => { 
     let config = {
         service: 'gmail',
         auth: {
@@ -24,27 +25,26 @@ const sendResetPasswordMail = (name, email, token) => {
     let Maingenarator = new Mailgen({
         theme: "default",
         product: {
-            name: "Mailgen",
+            name: text,
             link: 'https://mailgen.js'
         }
     });
 
     let response = {
         body: {
-            name: "Neethu.Nallat",
-            intro: "Your bill has arrived",
-            table: {
-                data: [
-                    {
-                        item: "Nodemailer Stack Book",
-                        description: "A Backend application",
-                        price: "$10.99",
-                    }
-                ]
-
+            name: name,
+            intro: 'Welcome to Mailgen! We\'re very excited to have you on board.',
+            action: {
+                instructions: 'To get started with Mailgen, please click here:',
+                button: {
+                    color: '#00FFFF', // Optional action button color
+                    text:text,
+                    link:link
+                }
             },
-            outro: "looking forward to do more business"
-
+            outro: 'Need help, or have questions? Just reply to this email, we\'d love to help.',
+            signature:false,
+            greeting:false
         }
     }
 
@@ -53,7 +53,7 @@ const sendResetPasswordMail = (name, email, token) => {
     let message = {
         from: EMAIL,
         to: email,
-        subject: "Place order",
+        subject:text,
         html: mail
     }
 
@@ -64,46 +64,11 @@ const sendResetPasswordMail = (name, email, token) => {
             console.log("Message Sent", info.response);
         }
     })
-    res.status(201).json("get bill succesfully......")
-
+   
 }
 
-// const sendResetPasswordMail=async(name,email,token)=>{
 
-//     try {
-//       const transporter =await  nodemailer.createTransport({
-//             host:'smtp.gmail.com',
-//             port:587,
-//             secure:false,
-//             requireTLS:true,
-//             auth:{
-//                 user:config.emailUser,
-//                 pass:config.emailPassword
-//             }
-//         });
-
-//         const mailOptions={
-//             from:config.emailUser,
-//             to:email,
-//             subject:'Fore reset password',
-//             html:'<p>Hii '+name+ ',Please copy the link and <a href="localhost:3001/forget_password?token='+token+'"> reset your password </a> '
-//         }
-//         transporter.sendMail(mailOptions,function(error,infor){
-//             if(error){
-//                 console.log(error);
-//             }else{
-//                 console.log("Mail has been sent :- ",infor.response);
-//             }
-//         });
-
-//     } catch (error) {
-//         res.status(400).send({success:false,msg:message.error});
-//     }
-
-// }
-
-
-///Token
+///Token/////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 const create_token = async (id) => {
     try {
@@ -116,7 +81,7 @@ const create_token = async (id) => {
 
 }
 
-//secure password
+//secure password///////////////////////////////////////////////////////////////
 
 const securePassword = async (password) => {
     try {
@@ -127,28 +92,38 @@ const securePassword = async (password) => {
     }
 }
 
-//register
+//register////////////////////////////////////////////////////////////////////////////
 
 const register = async (req, res) => {
 
     try {
+        const {name,email,password} = req.body
 
-        const spassword = await securePassword(req.body.password);
-        const user = new User({
-            name: req.body.name,
-            email: req.body.email,                                                                   // password:req.body.password, 
-            password: spassword
-            // image:req.file.filename,
-
-        });
-
-        const userData = await User.findOne({ email: req.body.email });
-
+        const spassword = await securePassword(password);
+        
+        const userData = await User.findOne({ email});
+        
+        
         if (userData) {
             res.status(200).send({ success: false, msg: "this email is already exists" });
         } else {
+            const user = new User({
+                name: name,
+                email: email,                                                              // password:req.body.password, 
+                password: spassword
+                // image:req.file.filename,
+                
+            });
             const user_data = await user.save();
-            res.status(200).send({ success: true, data: user_data });
+            const randomString=randomstring.generate()
+            const data= await User.findOneAndUpdate({email},{$set:{
+                token:randomString
+            }});
+            const text = 'verify your account'
+            const instruction='To verify your account ,please click here:'
+            const link=`http://localhost:4200/verifyaccount?token=${randomString}`
+            sendResetPasswordMail(data.name, data.email, text, instruction, link)
+            res.status(200).send({ success: true, message:"open the email and verify" });
         }
     } catch (error) {
         res.status(400).send(error.message);
@@ -156,7 +131,32 @@ const register = async (req, res) => {
 
 }
 
-//login method
+//____________________veify user _______________________________________//
+
+const verify_user=async(req,res)=>{
+    try{
+        const token=req.query.token
+        const userData=await User.findOneAndUpdate({token}
+            ,{
+            $set:{
+                verified:true,
+                token:""
+            }
+        },{new:true}
+        )
+        console.log("userData",userData);
+        if(userData){
+            res.status(200).send({ success: true, message:"Your account has been verified",data:userData});
+        }else{
+          res.status(400).send({condition:false,message:"The link has been expired"})
+        }
+    }catch(error){
+        res.status(400).send(error.message);
+
+    }
+}
+
+//login method_______________________________________________
 
 const login = async (req, res) => {
     try {
@@ -177,7 +177,7 @@ const login = async (req, res) => {
                 }
                 const response = {
                     success: true,
-                    msg: "user details",
+                    msg: "Login successfully........",
                     data: userResult
                 }
 
@@ -186,11 +186,11 @@ const login = async (req, res) => {
 
             } else {
 
-                res.status(200).send({ success: false, msg: "Your details are incorrect" })
+                res.status(200).send({ success: false, message: "Your details are incorrect" })
             }
 
         } else {
-            res.status(200).send({ success: false, msg: "Your details are incorrect" })
+            res.status(200).send({ success: false, message: "Your details are incorrect" })
 
         }
     } catch (error) {
@@ -199,7 +199,7 @@ const login = async (req, res) => {
     }
 }
 
-//update password
+//update password/////////////////////////////////////////////////////////////////////
 
 const update_password = async (req, res) => {
     try {
@@ -233,7 +233,7 @@ const update_password = async (req, res) => {
 
 }
 
-//forget_password
+//forget_password//////////////////////////////////////////////////////////////////////////////////////////
 
 
 const forget_password = async (req, res) => {
@@ -244,14 +244,18 @@ const forget_password = async (req, res) => {
         const userData = await User.findOne({ email });
 
         if (userData) {
+
             const randomString = randomstring.generate();
             const data = await User.findOneAndUpdate({ email }, { $set: { token: randomString } });
             console.log("hello");
-            await sendResetPasswordMail(userData.name, userData.email, randomString)
-            res.status(200).send({ success: true, msg: "Please check your inbox of  mail and reset your password" });
+            const instruction='Reset Password'
+            const text='Reset Your password'
+            const link=`http://localhost:4200/resert-password?token=${randomString}`
+            sendResetPasswordMail(data.name,data.email,instruction,text,link);
+            res.status(210).json({  msg: "Please check your inbox of  mail and reset your password" });
 
         } else {
-            res.status(200).send({ success: true, msg: "this email is not exists" });
+            res.status(400).send({ success: false , msg: "this email is not exists" });
 
         }
     } catch (error) {
@@ -259,9 +263,39 @@ const forget_password = async (req, res) => {
     }
 }
 
+
+/////// Reset password /////////////////////////////////////////////////////
+
+const Reset_password=async(req,res)=>{ 
+
+try{
+    const token=req.query.token;
+    const password=req.body.password;
+    const newPassword=await securePassword(password);
+
+    const userData=await User.findOneAndUpdate({token:token},
+        {$set:{
+        password:newPassword,
+        token:''
+    }
+},{new:true});
+   
+    if(userData){
+        res.status(200).json({ success: true, message:"user password has been reset...",data:userData });
+    }else{
+        res.status(400).json({ success: false,message:"this link has been expired........." });
+    }
+}catch(error){
+    res.status(404).json({ success: false, message: "error.message" });
+}
+
+}
+
 module.exports = {
     register,
     login,
     update_password,
-    forget_password
+    forget_password,
+    Reset_password,
+    verify_user
 }

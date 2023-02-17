@@ -7,7 +7,7 @@ const verifyToken = async(req,res,next)=>{
 
     const token=  req.headers["autherization"];
 
-    if(!token){
+    if(!token){+
         res.status(200).sent({success:false,msg:"A token is required for authentication"});
     }
     try{
